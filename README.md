@@ -1,5 +1,5 @@
 # isc
-Intelligently Selective Copy (`isc`) is a ⚡️amazingly fast⚡️(sorry the meme had to be done) cli tool that copies all 
+Intelligently Selective Copy (`isc`) is a ⚡blazingly fast⚡(sorry the meme had to be done) cli tool that copies all 
 the files from source to destination directory, but only those files that are not present in the destination directory. 
 The equality of files is determined by their sha256 checksums. The tool computes the checksums of the files in parallel!
 
