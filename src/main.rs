@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::fs::{File, ReadDir};
 use std::io::Read;
@@ -40,25 +40,57 @@ fn main() -> color_eyre::Result<()> {
 
     // for each file in source, calculate hash and store in hashmap
     let (source_hashes, destination_hashes) = rayon::join(
-        || extract_hashes(fs::read_dir(source_dir.clone()).unwrap()),
-        || extract_hashes(fs::read_dir(destination_dir.clone()).unwrap()));
+        || extract_file_to_hash(fs::read_dir(source_dir.clone()).unwrap()),
+        || extract_file_hash(fs::read_dir(destination_dir.clone()).unwrap()));
 
     // for each file in source, check if it exists in destination, only copy if it doesn't
     source_hashes
         .par_iter()
         // if the hash of the file in source is in the destination, then it exists, so don't copy
-        .filter(|(file, hash)|{
-            destination_hashes.values().any(|x| &x == hash)
+        .filter(|(_, hash)| {
+            !destination_hashes.contains(*hash)
         })
         .for_each(|(file, _)| {
-           fs::copy(file,destination_dir.join(file.file_name().unwrap())).unwrap();
+            fs::copy(file, destination_dir.join(file.file_name().unwrap())).unwrap();
         });
 
 
     Ok(())
 }
 
-fn extract_hashes(entries: ReadDir) -> HashMap<PathBuf, [u8; 32]> {
+
+fn extract_file_hash(entries: ReadDir) -> HashSet<[u8; 32]> {
+    let hash_sets = Mutex::new(HashSet::new());
+
+
+    let file_hashes = entries
+        .par_bridge()
+        // map each entry to PathBuf, panic if it's a directory
+        .map(|entry| {
+            let entry = entry.expect("Failed to read entry");
+            let path = entry.path();
+            if path.is_dir() {
+                panic!("ISC only supports if the directory only contains files");
+            }
+            entry.path()
+        })
+        .map(|path| {
+            let mut file = File::open(path.clone()).unwrap();
+            file_sha256(&mut file).unwrap()
+        });
+
+    file_hashes.for_each(|hash| {
+        hash_sets
+            .lock()
+            .unwrap() //  I'm been told by a Tokio developer that mutex poisoning is dumb anyway
+            .insert(hash);
+    });
+
+
+    hash_sets.into_inner().unwrap()
+}
+
+fn extract_file_to_hash(entries: ReadDir) -> HashMap<PathBuf, [u8; 32]> {
     let filename_to_hash = Mutex::new(HashMap::new());
 
     // map each entry to PathBuf, panic if it's a directory
