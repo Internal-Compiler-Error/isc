@@ -29,6 +29,8 @@ fn file_sha256(file: &mut File) -> color_eyre::Result<[u8; 32]> {
 
 
 fn main() -> color_eyre::Result<()> {
+    color_eyre::install()?;
+
     let args = Args::parse();
     println!("{:?}", args);
 
