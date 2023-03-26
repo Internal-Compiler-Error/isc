@@ -7,6 +7,13 @@ The equality of files is determined by their sha256 checksums. The tool computes
 Currently the source directory can only contain files and not directories. Haven't decided what is the semantics of 
 copying directories involving symbolic links yet.
 
+# Use Case Rationale
+You know those (hypothetical) websites where people upload un-PC materials in online drive links? Often as the links
+get taken down and different people upload a slightly different set of files with different names, you end up with
+a bunch of files that are the same but with different names.
+
+**Yes my dumbness just realized this tool is a fancy set union calculator...**
+
 # Usage
 ```bash
 ics <source> <destination>
