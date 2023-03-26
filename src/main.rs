@@ -2,7 +2,6 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::fs::{File, ReadDir};
 use std::io::{BufReader, Read};
-use std::os::fd::AsRawFd;
 use rayon::prelude::*;
 use std::path::{PathBuf};
 use std::sync::Mutex;
@@ -50,16 +49,15 @@ fn main() -> color_eyre::Result<()> {
         || extract_file_to_hash(fs::read_dir(source_dir.clone()).unwrap()),
         || extract_file_hash(fs::read_dir(destination_dir.clone()).unwrap()));
 
+    // TODO: should return the success of each copy operation associated with the file
     // for each file in source, check if it exists in destination, only copy if it doesn't
-    source_hashes
+    let copy_ops:Vec<_> = source_hashes
         .par_iter()
         // if the hash of the file in source is in the destination, then it exists, so don't copy
-        .filter(|(_, hash)| {
-            !destination_hashes.contains(*hash)
-        })
-        .for_each(|(file, _)| {
-            fs::copy(file, destination_dir.join(file.file_name().unwrap())).unwrap();
-        });
+        .filter(|(_, hash)| !destination_hashes.contains(*hash))
+        .map(|(file, _)| { fs::copy(file, destination_dir.join(file.file_name().unwrap())) })
+        .collect();
+
 
 
     Ok(())
@@ -72,14 +70,10 @@ fn extract_file_hash(entries: ReadDir) -> HashSet<[u8; 32]> {
 
     let file_hashes = entries
         .par_bridge()
-        // map each entry to PathBuf, panic if it's a directory
-        .map(|entry| {
+        .filter_map(|entry| {
             let entry = entry.expect("Failed to read entry");
             let path = entry.path();
-            if path.is_dir() {
-                panic!("ISC only supports if the directory only contains files");
-            }
-            entry.path()
+            if path.is_dir() { None } else { Some(entry.path()) }
         })
         .map(|path| {
             let mut file = File::open(path.clone()).unwrap();
@@ -103,13 +97,11 @@ fn extract_file_to_hash(entries: ReadDir) -> HashMap<PathBuf, [u8; 32]> {
     // map each entry to PathBuf, panic if it's a directory
     let file_hashes = entries
         .par_bridge()
-        .map(|entry| {
+        // ignore directories for now
+        .filter_map(|entry| {
             let entry = entry.expect("Failed to read entry");
             let path = entry.path();
-            if path.is_dir() {
-                panic!("ISC only supports if the directory only contains files");
-            }
-            entry.path()
+            if path.is_dir() { None } else { Some(entry.path()) }
         })
         .map(|path| {
             let mut file = File::open(path.clone()).unwrap();

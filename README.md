@@ -28,3 +28,4 @@ ics <source>
 - [ ] Add support for specifying the number of parallel workers
 - [ ] Use `tokio` to make copying parallel
 - [ ] Allow for specifying the hashing algorithm
+- [ ] Fancy progress bar
