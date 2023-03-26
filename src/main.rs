@@ -1,7 +1,8 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::fs::{File, ReadDir};
-use std::io::Read;
+use std::io::{BufReader, Read};
+use std::os::fd::AsRawFd;
 use rayon::prelude::*;
 use std::path::{PathBuf};
 use std::sync::Mutex;
@@ -20,7 +21,13 @@ fn file_sha256(file: &mut File) -> color_eyre::Result<[u8; 32]> {
     let mut hasher = Sha256::new();
     let mut buffer = [0; 65536]; // 2^16
 
-    while let Ok(len) = file.read(&mut buffer) {
+    let mut reader = BufReader::new(file);
+    while let Ok(len) = reader.read(&mut buffer) {
+        // I am dumb, turns out EOF is not an error
+        if len == 0 {
+            break;
+        }
+
         hasher.update(&buffer[..len]);
     }
 
@@ -32,8 +39,6 @@ fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
 
     let args = Args::parse();
-    println!("{:?}", args);
-
 
     let source_dir = args.source;
     // if destination is not provided, use current directory
