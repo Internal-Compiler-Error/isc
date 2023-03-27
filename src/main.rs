@@ -4,19 +4,66 @@ use std::fs::{File, ReadDir};
 use std::io::{BufReader, Read};
 use rayon::prelude::*;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use clap::Parser;
 use futures::stream::FuturesOrdered;
 use sha2::{Digest, Sha256};
 use configuration::Args;
 use crate::configuration::build_tokio_runtime;
 
+use tokio::io::AsyncReadExt;
+
 mod file_copy;
 mod join_all;
 mod report;
 mod configuration;
+mod checksum;
 
+use tokio::sync::Notify;
 use crate::report::Report;
+
+
+async fn sha256(file: tokio::fs::File) -> color_eyre::Result<[u8; 32]> {
+    // many painful hours were spent trying to avoid locking, I've failed...
+    // If you can make this lock free by passing the hasher and buffer back and forth, please do
+
+    let hasher = Arc::new(Mutex::new(Sha256::new()));
+    let buffer = Arc::new(Mutex::new(Box::new([0; 65536]))); // 2^16
+
+    let mut reader = tokio::io::BufReader::new(file);
+    let hash_done = Arc::new(Notify::new());
+
+    loop {
+        hash_done.notified().await;
+        {
+            let mut buffer = buffer.lock().unwrap();
+            let len = reader.read(buffer.as_mut_slice()).await?;
+
+            if len == 0 {
+                break;
+            }
+        }
+
+        let hasher_clone = hasher.clone();
+        let buffer_clone = buffer.clone();
+        let hash_done_clone = hash_done.clone();
+        rayon::spawn(move || {
+            let mut hasher = hasher_clone.lock().unwrap();
+            let buffer = buffer_clone.lock().unwrap();
+            hasher.update(&buffer[..]);
+            hash_done_clone.notify_one();
+        });
+    }
+
+
+    // I've suffered too much to get this compile
+    let digest = Arc::try_unwrap(hasher)
+        .unwrap()
+        .into_inner()?
+        .finalize();
+
+    Ok(digest.into())
+}
 
 fn file_sha256(file: &mut File) -> color_eyre::Result<[u8; 32]> {
     let mut hasher = Sha256::new();
