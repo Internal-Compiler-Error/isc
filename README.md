@@ -1,7 +1,9 @@
 # isc
-Intelligently Selective Copy (`isc`) is a ⚡blazingly fast⚡(sorry the meme had to be done) cli tool that copies all 
-the files from source to destination directory, but only those files that are not present in the destination directory. 
-The equality of files is determined by their sha256 checksums. The tool computes the checksums of the files in parallel!
+Intelligently Selective Copy (isc) is a⚡blazingly fast⚡(sorry the meme had to be done) cli tool that copies all the
+files from source to destination directory, but only those files that are not present in the destination directory. The
+equality of files is determined by their sha256 checksums. The tool computes the checksums of the files in parallel,
+then copies the ones that need to copy in parallel. Since NVMe SSDs support parallel reads and writes, this is much
+faster than doing the operations one by one.
 
 ## Note
 Currently the source directory can only contain files and not directories. Haven't decided what is the semantics of 
@@ -26,6 +28,6 @@ ics <source>
 # TODO
 - [ ] Add support for copying directories
 - [ ] Add support for specifying the number of parallel workers
-- [ ] Use `tokio` to make copying parallel
+- [x] Use `tokio` to make copying parallel
 - [ ] Allow for specifying the hashing algorithm
 - [ ] Fancy progress bar

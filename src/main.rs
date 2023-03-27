@@ -3,26 +3,20 @@ use std::fs;
 use std::fs::{File, ReadDir};
 use std::io::{BufReader, Read};
 use rayon::prelude::*;
-use std::path::{PathBuf};
+use std::path::PathBuf;
 use std::sync::Mutex;
 use clap::Parser;
 use futures::stream::FuturesOrdered;
-use sha2::{Sha256, Digest};
-use tokio::runtime::Runtime;
+use sha2::{Digest, Sha256};
+use configuration::Args;
+use crate::configuration::build_tokio_runtime;
 
 mod file_copy;
 mod join_all;
 mod report;
+mod configuration;
 
-use crate::report::{Report};
-
-
-#[derive(Parser, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
-#[command(author, version, about, long_about = None)]
-struct Args {
-    source: PathBuf,
-    destination: Option<PathBuf>,
-}
+use crate::report::Report;
 
 fn file_sha256(file: &mut File) -> color_eyre::Result<[u8; 32]> {
     let mut hasher = Sha256::new();
@@ -71,7 +65,7 @@ fn main() -> color_eyre::Result<()> {
         });
 
     // for each copy task, spawn a task to copy the file
-    let tokio_runtime = Runtime::new()?;
+    let tokio_runtime = build_tokio_runtime(args.thread_count)?;
     let runtime_handle = tokio_runtime.handle();
 
     let futures = Mutex::new(FuturesOrdered::new());
