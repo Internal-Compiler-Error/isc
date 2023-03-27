@@ -6,7 +6,15 @@ use rayon::prelude::*;
 use std::path::{PathBuf};
 use std::sync::Mutex;
 use clap::Parser;
+use futures::stream::FuturesOrdered;
 use sha2::{Sha256, Digest};
+use tokio::runtime::Runtime;
+
+mod file_copy;
+mod join_all;
+mod report;
+
+use crate::report::{Report};
 
 
 #[derive(Parser, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
@@ -49,16 +57,39 @@ fn main() -> color_eyre::Result<()> {
         || extract_file_to_hash(fs::read_dir(source_dir.clone()).unwrap()),
         || extract_file_hash(fs::read_dir(destination_dir.clone()).unwrap()));
 
-    // TODO: should return the success of each copy operation associated with the file
-    // for each file in source, check if it exists in destination, only copy if it doesn't
-    let copy_ops:Vec<_> = source_hashes
+
+    // find out what files need to be copied
+    let should_copy = source_hashes
         .par_iter()
-        // if the hash of the file in source is in the destination, then it exists, so don't copy
-        .filter(|(_, hash)| !destination_hashes.contains(*hash))
-        .map(|(file, _)| { fs::copy(file, destination_dir.join(file.file_name().unwrap())) })
-        .collect();
+        .filter(|(_, hash)| !destination_hashes.contains(*hash));
+
+    // for those files, that need to copy, construct a list of source and destination paths
+    let copy_tasks = should_copy
+        .map(|(source, _)| {
+            let destination = destination_dir.join(source.file_name().unwrap());
+            (source.clone(), destination)
+        });
+
+    // for each copy task, spawn a task to copy the file
+    let tokio_runtime = Runtime::new()?;
+    let runtime_handle = tokio_runtime.handle();
+
+    let futures = Mutex::new(FuturesOrdered::new());
+    copy_tasks
+        .for_each(|(source, destination)| {
+            futures
+                .lock()
+                .unwrap()
+                .push_back(runtime_handle.spawn(file_copy::copy(source, destination)));
+        });
+    let futures = futures.into_inner().unwrap();
 
 
+    // wait for all copy operations to complete
+    let copy_reports = join_all::join_all_to_vec(futures, &runtime_handle);
+
+    // print a report
+    println!("{}", Report(&copy_reports));
 
     Ok(())
 }
