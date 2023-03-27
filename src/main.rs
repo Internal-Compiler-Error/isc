@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::fs::{File, ReadDir};
-use std::io::{BufReader, Read};
+use std::io::{BufReader, Read, stdout};
 use rayon::prelude::*;
 use std::path::{PathBuf};
 use std::sync::Mutex;
@@ -13,8 +13,6 @@ use tokio::runtime::Runtime;
 mod file_copy;
 mod join_all;
 mod report;
-
-use crate::report::{Report};
 
 
 #[derive(Parser, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
@@ -80,16 +78,13 @@ fn main() -> color_eyre::Result<()> {
             futures
                 .lock()
                 .unwrap()
-                .push_back(runtime_handle.spawn(file_copy::copy(source, destination)));
+                .push_back(runtime_handle.spawn(file_copy::copy_with_report(source, destination, stdout())));
         });
     let futures = futures.into_inner().unwrap();
 
 
     // wait for all copy operations to complete
-    let copy_reports = join_all::join_all_to_vec(futures, &runtime_handle);
-
-    // print a report
-    println!("{}", Report(&copy_reports));
+    join_all::join_all_to_vec(futures, &runtime_handle);
 
     Ok(())
 }

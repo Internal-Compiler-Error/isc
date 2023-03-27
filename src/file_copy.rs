@@ -1,6 +1,8 @@
 use std::fmt::Display;
+use std::io::Write;
 use std::path::PathBuf;
 use tokio::fs;
+use crate::report::Report;
 
 #[derive(Debug)]
 pub struct CopyResult {
@@ -43,6 +45,16 @@ pub async fn copy(src: PathBuf, dst: PathBuf) -> CopyResult {
     let copy_result = fs::copy(&src, &dst).await;
 
     CopyResult::new(src, dst, copy_result)
+}
+
+/// Same as copy but print the result immediate to the out_stream, note the out_stream is *not* async
+/// as we want to print the result immediately
+pub async fn copy_with_report(src: PathBuf, dst: PathBuf, mut out_stream: impl Write) -> CopyResult {
+    // todo: maybe there is a way to avoid copy while still allowing parallelism?
+    let copy_result = copy(src.clone(), dst.clone()).await;
+
+    writeln!(out_stream, "{}", Report(&copy_result)).unwrap();
+    copy_result
 }
 
 #[cfg(test)]
