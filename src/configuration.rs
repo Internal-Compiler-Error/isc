@@ -20,7 +20,8 @@ pub struct Args {
     /// The source directory to copy from
     pub source: PathBuf,
     /// The destination directory to copy to, if not provided, the current directory will be used
-    pub destination: Option<PathBuf>,
+    #[clap(default_value_os_t = PathBuf::from(r#"./"#))]
+    pub destination: PathBuf,
     #[clap(short, long, default_value_t = default_thread_count())]
     pub thread_count: usize,
 }

@@ -42,8 +42,7 @@ fn main() -> color_eyre::Result<()> {
     let args = Args::parse();
 
     let source_dir = args.source;
-    // if destination is not provided, use current directory
-    let destination_dir = args.destination.unwrap_or(PathBuf::from(r#"./"#));
+    let destination_dir = args.destination;
 
 
     // for each file in source, calculate hash and store in hashmap
