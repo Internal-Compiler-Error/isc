@@ -8,5 +8,10 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.1.13", features = ["derive"] }
 color-eyre = "0.6.2"
+futures = "0.3.27"
 rayon = "1.7.0"
 sha2 = { version = "0.10.6", features = ["asm-aarch64"] }
+tokio = { version = "1.26.0", features = ["fs", "rt", "rt-multi-thread"] }
+
+[profile.release]
+debug = true
